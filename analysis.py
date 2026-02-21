@@ -176,6 +176,29 @@ def check_stock(ticker, period="5y", interval="1d"):
             high=data["High"], low=data["Low"], close=data["Close"], window=14
         )
 
+        # --- Análisis de Canal de Tendencia (SMA 50/200) ---
+        data["SMA_50"] = data["Close"].rolling(window=50).mean()
+        data["SMA_200"] = data["Close"].rolling(window=200).mean()
+        
+        last_close = data["Close"].iloc[-1]
+        last_sma50 = data["SMA_50"].iloc[-1]
+        last_sma200 = data["SMA_200"].iloc[-1]
+        
+        # Calcular pendiente de SMA 50 (últimos 5 días)
+        prev_sma50 = data["SMA_50"].iloc[-6]
+        slope_sma50 = (last_sma50 - prev_sma50) / prev_sma50
+        
+        canal_status = "info"
+        if last_close > last_sma200 and slope_sma50 > 0.001:
+            canal_text = "Canal: ALCISTA (Tendencia de fondo fuerte)"
+            canal_status = "pass"
+        elif last_close < last_sma200 and slope_sma50 < -0.001:
+            canal_text = "Canal: BAJISTA (Tendencia de fondo débil)"
+            canal_status = "fail"
+        else:
+            canal_text = "Canal: LATERAL / CONSOLIDACIÓN"
+            canal_status = "info"
+
         adx_val = data["ADX_14"].iloc[-1]
         adx_pos = data["ADX_POS_14"].iloc[-1]
         adx_neg = data["ADX_NEG_14"].iloc[-1]
@@ -218,6 +241,9 @@ def check_stock(ticker, period="5y", interval="1d"):
         )  # Use new status for color        messages.append({'text': adx_text, 'status': adx_status})
         if adx_status == "pass":
             pass_count += 1
+
+        # Canal de Tendencia
+        messages.append({"text": canal_text, "status": canal_status})
 
         # Paso 4: Konkorde
         # Análisis de Minoristas (PVI / Montaña)
