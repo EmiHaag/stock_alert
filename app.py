@@ -107,10 +107,10 @@ class App(ctk.CTk):
             self.spinner_idx += 1
             self.after(80, self.animate_spinner)
         else:
-            # Clean up spinner on finish (no "OK")
+            # Clean up spinner on finish (no "OK") and add spacing
             self.results_textbox.configure(state="normal")
             self.results_textbox.delete("end-2c", "end-1c")
-            self.results_textbox.insert("end-1c", "\n", "info")
+            self.results_textbox.insert("end-1c", "\n\n", "info")
             self.results_textbox.configure(state="disabled")
 
     def start_analysis_thread(self, from_auto=False):
