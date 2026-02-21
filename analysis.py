@@ -65,17 +65,14 @@ def check_stock(ticker, period="5y", interval="1d"):
         data['PVI'] = pvi
         data['NVI'] = nvi
         
-        # 2. Suavizado para obtener las líneas de Konkorde
-        # Manos Fuertes (Azul en TradingView) -> Basado en NVI suavizado
-        # Usamos una EMA corta del NVI contra una EMA institucional larga
-        nvi_fast = data['NVI'].ewm(span=90).mean()
-        nvi_slow = data['NVI'].ewm(span=255).mean()
-        data['manos_fuertes'] = (nvi_fast - nvi_slow)
+        # 2. Suavizado para obtener las líneas de Konkorde (Estándar Blai5: 15 periodos)
+        # Manos Fuertes (Azul en TradingView) -> NVI - Media(NVI, 15)
+        nvi_ema_15 = data['NVI'].ewm(span=15).mean()
+        data['manos_fuertes'] = (data['NVI'] - nvi_ema_15)
         
-        # Minoristas (Rojo en TradingView) -> Basado en PVI y RSI
-        # Aquí usamos una versión que captura la "montaña" (precio + volumen)
-        stoch_rsi = ta.momentum.stochrsi(data['Close'], window=14)
-        data['minoristas'] = (stoch_rsi * 100) - 50 # Centrado en cero
+        # Minoristas (Rojo en TradingView) -> PVI - Media(PVI, 15)
+        pvi_ema_15 = data['PVI'].ewm(span=15).mean()
+        data['minoristas'] = (data['PVI'] - pvi_ema_15)
         
         # Media de señal para Konkorde (Marrón en TradingView)
         data['konkorde_signal'] = data['manos_fuertes'].rolling(window=15).mean()
