@@ -36,28 +36,48 @@ def check_stock(ticker, period="5y", interval="1d"):
             high=data["High"], low=data["Low"], close=data["Close"], window=14
         )
 
-        price_range = data["High"] - data["Low"]
-        price_range = price_range.replace(0, 1)
-        blue_line = (
-            pd.Series(
-                ((data["Close"] - data["Low"]) - (data["High"] - data["Close"]))
-                / price_range
-                * data["Volume"]
-            )
-            .rolling(window=10)
-            .sum()
-        )
-        green_line = (
-            pd.Series(
-                ((data["High"] + data["Low"]) / 2 - data["Close"].shift(1))
-                * data["Volume"]
-            )
-            .rolling(window=20)
-            .mean()
-        )
-        brown_line = (blue_line + green_line).rolling(window=5).mean()
-        data["konkorde_brown"] = brown_line
-
+        # --- Cálculo de Konkorde (Versión Mejorada basada en PVI/NVI) ---
+        # 1. Cálculo de PVI y NVI
+        pvi = [100.0]
+        nvi = [100.0]
+        
+        close_prices = data['Close'].values
+        volumes = data['Volume'].values
+        
+        for i in range(1, len(data)):
+            prev_close = close_prices[i-1]
+            curr_close = close_prices[i]
+            prev_vol = volumes[i-1]
+            curr_vol = volumes[i]
+            
+            price_change = (curr_close - prev_close) / prev_close
+            
+            if curr_vol > prev_vol:
+                pvi.append(pvi[-1] * (1 + price_change))
+                nvi.append(nvi[-1])
+            elif curr_vol < prev_vol:
+                pvi.append(pvi[-1])
+                nvi.append(nvi[-1] * (1 + price_change))
+            else:
+                pvi.append(pvi[-1])
+                nvi.append(nvi[-1])
+        
+        data['PVI'] = pvi
+        data['NVI'] = nvi
+        
+        # 2. Suavizado para obtener las líneas de Konkorde
+        # Manos Fuertes (Azul en TradingView) -> Basado en NVI
+        nvi_ema = data['NVI'].ewm(span=255).mean() # Un periodo largo para captar la base institucional
+        data['manos_fuertes'] = (data['NVI'] - nvi_ema)
+        
+        # Minoristas (Rojo en TradingView) -> Basado en PVI y RSI
+        # Aquí usamos una versión que captura la "montaña" (precio + volumen)
+        stoch_rsi = ta.momentum.stochrsi(data['Close'], window=14)
+        data['minoristas'] = (stoch_rsi * 100) - 50 # Centrado en cero
+        
+        # Media de señal para Konkorde (Marrón en TradingView)
+        data['konkorde_signal'] = data['manos_fuertes'].rolling(window=15).mean()
+        
         # Lógica de Alertas
         pass_count = 0
         messages = []
@@ -168,92 +188,46 @@ def check_stock(ticker, period="5y", interval="1d"):
             pass_count += 1
 
         # Paso 4: Konkorde
-        # Análisis de la línea azul (minoristas), a menudo representada como roja/azul.
-        last_blue = blue_line.iloc[-1]
-        prev_blue = blue_line.iloc[-2]
-        cruce_cero_azul = prev_blue < 0 and last_blue > 0
-
-        if cruce_cero_azul:
-            blue_line_text = f"Konkorde (minoristas): Cruce alcista de línea ({last_blue/1_000_000:.2f}M). Posible señal de compra."
-            messages.append({'text': blue_line_text, 'status': 'alert_buy'})
+        # Análisis de Minoristas (PVI / Montaña)
+        last_minorista = data['minoristas'].iloc[-1]
+        prev_minorista = data['minoristas'].iloc[-2]
+        
+        minorista_cruce_cero = prev_minorista < 0 and last_minorista > 0
+        if minorista_cruce_cero:
+            messages.append({'text': "Konkorde: Interés minorista entrando (Cruce a cero).", 'status': 'alert_buy'})
             pass_count += 1
         
-        # Chequeo de euforia de minoristas (línea azul en el 10% superior)
-        blue_line_history = blue_line.dropna()
-        quantile_90_blue = blue_line_history.quantile(0.90)
+        # Análisis de Manos Fuertes (NVI)
+        last_mf = data['manos_fuertes'].iloc[-1]
+        prev_mf = data['manos_fuertes'].iloc[-2]
+        
+        mf_acumulando = last_mf > 0
+        mf_distribuyendo = last_mf < 0
+        mf_aumentando = last_mf > prev_mf
 
-        if last_blue >= quantile_90_blue:
-            blue_line_text = f"Konkorde (minoristas): Euforia detectada ({last_blue/1_000_000:.2f}M > {quantile_90_blue/1_000_000:.2f}M). Posible señal de venta."
-            messages.append({'text': blue_line_text, 'status': 'alert_sell'})
-            pass_count += 1
+        konkorde_status = "info"
+        if mf_acumulando:
+            konkorde_interpretation = "Manos Fuertes ACUMULANDO (Positivo)."
+            konkorde_status = "pass"
+            if mf_aumentando:
+                konkorde_interpretation += " Incrementando posición."
+        else:
+            konkorde_interpretation = "Manos Fuertes DISTRIBUYENDO (Negativo)."
+            konkorde_status = "fail"
+            if not mf_aumentando:
+                konkorde_interpretation += " Reduciendo posición."
 
-        konkorde_val = data["konkorde_brown"].iloc[-1]
-        konkorde_val_display = (
-            konkorde_val / 1_000_000 if abs(konkorde_val) >= 1_000_000 else konkorde_val
-        )  # Scale if large, otherwise keep original
-        konkorde_unit = (
-            "M" if abs(konkorde_val) >= 1_000_000 else ""
-        )  # Unit for millions
+        messages.append({"text": f"Konkorde: {konkorde_interpretation}", "status": konkorde_status})
 
-        # Define a neutral zone around zero for Konkorde
-        konkorde_neutral_threshold = 0.15  # Small threshold for "near zero"
-
-        konkorde_interpretation = "Neutral."
-        konkorde_status = "info"  # Default to info, as it's not a strict filter anymore
-
-        konkorde_compra_signal = konkorde_val > konkorde_neutral_threshold
-        konkorde_venta_signal = konkorde_val < -konkorde_neutral_threshold
-        konkorde_cerca_cero = (
-            -konkorde_neutral_threshold <= konkorde_val <= konkorde_neutral_threshold
-        )
-
-        if konkorde_compra_signal:
-            konkorde_interpretation = "Manos grandes acumulando."
-            konkorde_status = "alert_buy"
-        elif konkorde_venta_signal:
-            konkorde_interpretation = "Manos grandes distribuyendo."
-            konkorde_status = "alert_sell"
-        elif konkorde_cerca_cero:
-            konkorde_interpretation = (
-                "Konkorde cerca de cero, posible consolidación o indecisión."
-            )
-
-        konkorde_text = f"Konkorde: {konkorde_val_display:.2f}{konkorde_unit}. {konkorde_interpretation}"
-        messages.append({"text": konkorde_text, "status": konkorde_status})
-
-        # Konkorde now contributes to pass_count if it strongly aligns with MACD signals
-        # and has a clear interpretation (not neutral around zero).
-        if (cruce_alcista and konkorde_compra_signal) or (
-            cruce_bajista and konkorde_venta_signal
-        ):
-            pass_count += 1
-
-        if cruce_alcista and konkorde_compra_signal:
-            messages.append(
-                {
-                    "text": f"\n*** ALERTA DE COMPRA para {ticker.upper()} ***",
-                    "status": "alert_buy",
-                }
-            )
-            messages.append(
-                {
-                    "text": "Motivo: Confirmación de compra por Konkorde.",
-                    "status": "alert_buy",
-                }
-            )
-        elif cruce_bajista and konkorde_venta_signal:
-            messages.append(
-                {
-                    "text": f"\n*** ALERTA DE VENTA para {ticker.upper()} ***",
-                    "status": "alert_sell",
-                }
-            )
-            messages.append(
-                {
-                    "text": "Motivo: Confirmación de venta por Konkorde.",
-                    "status": "alert_sell",
-                }
-            )
+        # Confirmación Konkorde + MACD
+        if (cruce_alcista and mf_acumulando):
+            messages.append({"text": "\n*** ALERTA DE COMPRA (Konkorde + MACD) ***", "status": "alert_buy"})
+            messages.append({"text": "Motivo: Cruce MACD con Institucionales comprando.", "status": "alert_buy"})
+            pass_count += 2
+        elif (cruce_bajista and mf_distribuyendo):
+            messages.append({"text": "\n*** ALERTA DE VENTA (Konkorde + MACD) ***", "status": "alert_sell"})
+            messages.append({"text": "Motivo: Cruce MACD con Institucionales vendiendo.", "status": "alert_sell"})
+            pass_count += 2
         # After all pass_count increments, create the initial header message and prepend it
         company_name = stock.info.get("longName", "")
         header_message_text = f"{ticker.upper()}"

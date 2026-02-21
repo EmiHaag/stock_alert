@@ -25,10 +25,11 @@ Se han introducido mejoras significativas en la lógica de los indicadores para 
     *   **Análisis de Zonas Históricas por Cuantiles**: En lugar de depender de los mínimos y máximos absolutos, el sistema ahora detecta si la línea de señal del MACD ha entrado en una zona de sobre-extensión. Se genera una alerta de "posible oportunidad" si la señal entra en el **10% inferior (compra)** o en el **10% superior (venta)** de su rango histórico de 5 años.
     *   **Valor de Señal Visible**: El valor numérico de la línea de señal del MACD ahora se muestra entre paréntesis para una referencia rápida.
 
-*   **Análisis Detallado de Konkorde**:
-    *   Además de rastrear a los grandes inversores (manos fuertes), ahora se analiza la línea que representa a los **inversores minoristas** (línea azul/roja en los gráficos).
-    *   **Señal de Compra por Cruce a Cero**: Se genera una alerta de `COMPRA` cuando la línea de minoristas cruza el nivel cero hacia arriba, indicando un posible inicio de interés comprador minorista.
-    *   **Señal de Venta por Euforia Minorista**: Se genera una alerta de `VENTA` cuando la línea de minoristas alcanza el **10% superior** de su rango histórico, lo que puede indicar un nivel de euforia insostenible que a menudo precede a una corrección.
+*   **Análisis Detallado de Konkorde (v3.1)**:
+    *   **Lógica PVI/NVI**: Se ha migrado a un sistema basado en el Índice de Volumen Positivo (PVI) y el Índice de Volumen Negativo (NVI) para una separación real entre tipos de inversores.
+    *   **Manos Fuertes (Institucionales)**: Se detectan mediante el análisis del NVI contra su media móvil de 255 sesiones. Esto permite identificar acumulación profesional incluso en días de poco movimiento o ruido.
+    *   **Minoristas**: Se analizan mediante el PVI y StochRSI, identificando momentos de interés genuino o de euforia insostenible.
+    *   **Confirmación Híbrida**: El sistema ahora otorga mayor relevancia (mayor `pass_count`) cuando un cruce de MACD es confirmado por la dirección de las Manos Fuertes de Konkorde.
 
 ## Lógica de Alertas y Análisis de Indicadores
 
