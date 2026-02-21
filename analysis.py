@@ -229,16 +229,23 @@ def check_stock(ticker, period="5y", interval="1d"):
             pass_count += 2
         # After all pass_count increments, create the initial header message and prepend it
         company_name = stock.info.get("longName", "")
-        header_message_text = f"{ticker.upper()}"
+        header_message_text = f" {ticker.upper()}"
         if company_name:
             header_message_text += f" ({company_name})"
 
         # Add current price
         current_price = data["Close"].iloc[-1]
-        header_message_text += f" - ${current_price:.2f} USD"
+        header_message_text += f" - ${current_price:.2f} USD "
 
-        header_message = {"text": header_message_text, "status": "info"}
+        # BORDER LOGIC
+        border_width = len(header_message_text) + 2
+        top_border = "╔" + "═" * (border_width - 2) + "╗"
+        bottom_border = "╚" + "═" * (border_width - 2) + "╝"
+        
+        header_message = {"text": f"{top_border}\n║{header_message_text}║\n╠" + "═" * (border_width - 2) + "╣", "status": "info"}
+        
         messages.insert(0, header_message)  # Insert at the beginning
+        messages.append({"text": bottom_border, "status": "info"}) # Add at the end
 
         return {"ticker": ticker, "pass_count": pass_count, "messages": messages}
 

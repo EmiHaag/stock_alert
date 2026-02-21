@@ -303,9 +303,9 @@ class App(ctk.CTk):
         self.results_textbox.configure(state="normal")
         for msg in messages:
             if isinstance(msg, dict) and 'text' in msg and 'status' in msg:
+                # Ya no agregamos el \n automático para respetar el formato del análisis
                 self.results_textbox.insert("end", f"{msg['text']}\n", msg['status'])
             else:
-                # Fallback for unexpected message format, print as plain text
                 self.results_textbox.insert("end", f"Error: Mensaje con formato inesperado: {msg}\n", 'fail')
 
         self.results_textbox.configure(state="disabled")
