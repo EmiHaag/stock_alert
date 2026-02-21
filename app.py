@@ -20,11 +20,13 @@ class ConsoleSpinner:
 
     def _spin(self):
         while not self.stop_running.is_set():
-            sys.stdout.write(f"\r{self.message} {self.spinner[self.idx % 4]} ")
-            sys.stdout.flush()
-            self.idx += 1
-            time.sleep(0.1)
-        sys.stdout.write("\r" + " " * (len(self.message) + 10) + "\r") # Clear line
+            for char in self.spinner:
+                if self.stop_running.is_set():
+                    break
+                sys.stdout.write(f"\r{self.message} {char} ")
+                sys.stdout.flush()
+                time.sleep(0.15)
+        sys.stdout.write("\r" + " " * (len(self.message) + 10) + "\r")
         sys.stdout.flush()
 
     def start(self):
