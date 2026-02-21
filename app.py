@@ -8,6 +8,8 @@ import sys
 from datetime import datetime
 import pytz
 
+STOCKS_FILE = "stocks.json"
+
 class ConsoleSpinner:
     def __init__(self, message="Analizando acciones..."):
         self.message = message
