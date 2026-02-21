@@ -10,40 +10,12 @@ import pytz
 
 STOCKS_FILE = "stocks.json"
 
-class ConsoleSpinner:
-    def __init__(self, message="Analizando acciones..."):
-        self.message = message
-        self.spinner = ['|', '/', '-', '\\']
-        self.idx = 0
-        self.stop_running = threading.Event()
-        self.thread = None
-
-    def _spin(self):
-        while not self.stop_running.is_set():
-            for char in self.spinner:
-                if self.stop_running.is_set():
-                    break
-                sys.stdout.write(f"\r{self.message} {char} ")
-                sys.stdout.flush()
-                time.sleep(0.15)
-        sys.stdout.write("\r" + " " * (len(self.message) + 10) + "\r")
-        sys.stdout.flush()
-
-    def start(self):
-        self.stop_running.clear()
-        self.thread = threading.Thread(target=self._spin)
-        self.thread.daemon = True
-        self.thread.start()
-
-    def stop(self):
-        if self.thread:
-            self.stop_running.set()
-            self.thread.join()
-
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.spinner = ConsoleSpinner()
+        self.spinner_chars = ['|', '/', '-', '\\']
+        self.spinner_idx = 0
+        self.is_loading = False
 
         # --- CONFIGURACIÓN DE LA VENTANA ---
         self.title("Monitor de Alertas de Acciones v2")
@@ -84,6 +56,10 @@ class App(ctk.CTk):
         self.auto_checkbox = ctk.CTkCheckBox(self.top_frame, text="Análisis Automático (cada 10 min)", variable=self.is_auto_analyzing, command=self.toggle_auto_analysis)
         self.auto_checkbox.grid(row=1, column=1, columnspan=2, padx=10, pady=5, sticky="w")
 
+        # --- LOADING SPINNER GUI ---
+        self.loading_label = ctk.CTkLabel(self.top_frame, text="", font=ctk.CTkFont(size=14, weight="bold"), text_color="#00FFFF")
+        self.loading_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
+
         # --- FRAME PARA SELECCIÓN DE TEMPORALIDAD ---
         self.periods_frame = ctk.CTkFrame(self.top_frame, corner_radius=10)
         self.periods_frame.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
@@ -123,6 +99,15 @@ class App(ctk.CTk):
         self.results_textbox.tag_config('alert_sell', foreground='#FFD700') # Oro
         self.results_textbox.configure(state="disabled")
 
+    def animate_spinner(self):
+        if self.is_loading:
+            char = self.spinner_chars[self.spinner_idx % 4]
+            self.loading_label.configure(text=f"Analizando {char}")
+            self.spinner_idx += 1
+            self.after(150, self.animate_spinner)
+        else:
+            self.loading_label.configure(text="")
+
     def start_analysis_thread(self, from_auto=False):
         if not from_auto and self.is_auto_analyzing.get():
             self.update_results([{'text': "Info: El análisis automático ya está en ejecución.", 'status': 'info'}])
@@ -135,7 +120,10 @@ class App(ctk.CTk):
             self.clear_textbox()
             self.results_textbox.see("0.0") # Scroll to top when starting a new analysis
             self.update_results([{'text': "Iniciando análisis manual...", 'status': 'info'}])
-            self.spinner.start()
+            
+            # INICIAR SPINNER GUI
+            self.is_loading = True
+            self.animate_spinner()
 
         selected_period_label = self.period_var.get()
         yfinance_params = self.YFINANCE_PERIOD_INTERVAL_MAP.get(selected_period_label, {"period": "1y", "interval": "1d"}) # Default to 1y, 1d
@@ -149,7 +137,7 @@ class App(ctk.CTk):
     def run_analysis(self, yfinance_period, yfinance_interval):
         tickers_input = self.entry_tickers.get()
         if not tickers_input:
-            self.spinner.stop()
+            self.is_loading = False
             self.update_results([{'text': "Error: Ingrese al menos un ticker.", 'status': 'fail'}])
             self.after(100, self.on_analysis_complete)
             return
@@ -220,7 +208,7 @@ class App(ctk.CTk):
         self.results_textbox.configure(state="disabled")
 
     def on_analysis_complete(self):
-        self.spinner.stop()
+        self.is_loading = False
         if not self.is_auto_analyzing.get():
             self.analyze_button.configure(state="normal")
 
