@@ -107,10 +107,9 @@ class App(ctk.CTk):
             self.spinner_idx += 1
             self.after(80, self.animate_spinner)
         else:
-            # Clean up spinner on finish (no "OK") and add spacing
+            # Clean up spinner character and clear line
             self.results_textbox.configure(state="normal")
             self.results_textbox.delete("end-2c", "end-1c")
-            self.results_textbox.insert("end-1c", "\n\n", "info")
             self.results_textbox.configure(state="disabled")
 
     def start_analysis_thread(self, from_auto=False):
@@ -162,11 +161,20 @@ class App(ctk.CTk):
         # Sort reports by pass_count in descending order
         all_reports.sort(key=lambda x: x['pass_count'], reverse=True)
 
+        # DETENER SPINNER Y AGREGAR SALTOS DE LINEA ANTES DE MOSTRAR RESULTADOS
+        self.is_loading = False
+        self.after(0, self.insert_separator_newlines)
+
         for report in all_reports:
-            self.after(0, self.update_results, report['messages'])
-            self.after(0, self.update_results, [{'text': "\n", 'status': 'info'}]) # Add a newline for separation
+            self.after(100, self.update_results, report['messages'])
+            self.after(100, self.update_results, [{'text': "\n", 'status': 'info'}]) # Add a newline for separation
         
-        self.after(100, self.on_analysis_complete)
+        self.after(200, self.on_analysis_complete)
+
+    def insert_separator_newlines(self):
+        self.results_textbox.configure(state="normal")
+        self.results_textbox.insert("end", "\n\n")
+        self.results_textbox.configure(state="disabled")
 
     def toggle_auto_analysis(self):
         if self.is_auto_analyzing.get():
