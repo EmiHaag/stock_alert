@@ -107,6 +107,60 @@ class App(ctk.CTk):
         if not self.is_auto_analyzing.get() and self.entry_tickers.get():
             self.start_analysis_thread()
 
+    def configure_tags(self):
+        self.results_textbox.tag_config('info', foreground='gray80')
+        self.results_textbox.tag_config('pass', foreground='#32CD32') # Verde lima
+        self.results_textbox.tag_config('fail', foreground='#FF4500') # Naranja-Rojo
+        self.results_textbox.tag_config('alert_buy', foreground='#00FFFF') # Cyan
+        self.results_textbox.tag_config('alert_sell', foreground='#FFD700') # Oro
+        self.results_textbox.tag_config('spinner', foreground='#00FFFF') # Color del spinner
+        self.results_textbox.configure(state="disabled")
+
+    def animate_spinner(self):
+        if self.is_loading:
+            char = self.spinner_chars[self.spinner_idx % len(self.spinner_chars)]
+            self.results_textbox.configure(state="normal")
+            # Overwrite the character at the very end
+            self.results_textbox.delete("end-2c", "end-1c")
+            self.results_textbox.insert("end-1c", char, "spinner")
+            self.results_textbox.configure(state="disabled")
+            self.spinner_idx += 1
+            self.after(80, self.animate_spinner)
+        else:
+            # Clean up spinner character and clear line
+            self.results_textbox.configure(state="normal")
+            self.results_textbox.delete("end-2c", "end-1c")
+            self.results_textbox.configure(state="disabled")
+
+    def start_analysis_thread(self, from_auto=False):
+        if not from_auto and self.is_auto_analyzing.get():
+            self.update_results([{'text': "Info: El análisis automático ya está en ejecución.", 'status': 'info'}])
+            return
+            
+        self.analyze_button.configure(state="disabled")
+        self.last_analysis_time = datetime.now()
+        
+        if not from_auto:
+            self.clear_textbox()
+            self.results_textbox.see("0.0") # Scroll to top when starting a new analysis
+            
+            # Start the line without a newline so spinner can append
+            self.results_textbox.configure(state="normal")
+            self.results_textbox.insert("end", "Iniciando análisis manual...  ", "info")
+            self.results_textbox.configure(state="disabled")
+            
+            self.is_loading = True
+            self.animate_spinner()
+
+        selected_period_label = self.period_var.get()
+        yfinance_params = self.YFINANCE_PERIOD_INTERVAL_MAP.get(selected_period_label, {"period": "1y", "interval": "1d"}) # Default to 1y, 1d
+        yfinance_period = yfinance_params["period"]
+        yfinance_interval = yfinance_params["interval"]
+        
+        thread = threading.Thread(target=self.run_analysis, args=(yfinance_period, yfinance_interval,))
+        thread.daemon = True
+        thread.start()
+
     # --- LÓGICA DE GESTIÓN DE LISTAS ---
     def change_active_list(self, new_name):
         # Primero guardamos lo que haya en la lista actual antes de cambiar
@@ -203,6 +257,71 @@ class App(ctk.CTk):
                 json.dump(data, f)
         except Exception as e:
             self.update_results([{'text': f"Error guardando acciones: {e}", 'status': 'fail'}])
+
+    def insert_separator_newlines(self):
+        self.results_textbox.configure(state="normal")
+        self.results_textbox.insert("end", "\n\n\n")
+        self.results_textbox.configure(state="disabled")
+
+    def toggle_auto_analysis(self):
+        if self.is_auto_analyzing.get():
+            self.clear_textbox()
+            self.update_results([{'text': "Modo automático ACTIVADO.", 'status': 'info'}])
+            self.analyze_button.configure(state="disabled")
+            self.auto_analysis_thread = threading.Thread(target=self.auto_analysis_loop)
+            self.auto_analysis_thread.daemon = True
+            self.auto_analysis_thread.start()
+        else:
+            self.update_results([{'text': "Modo automático DESACTIVADO.", 'status': 'info'}])
+            self.analyze_button.configure(state="normal")
+            # El loop se detendrá naturalmente en la próxima iteración al chequear `is_auto_analyzing`
+
+    def auto_analysis_loop(self):
+        while self.is_auto_analyzing.get() and self.run_auto:
+            if self.is_market_open():
+                self.clear_textbox()
+                self.update_results([{'text': f"Mercado ABIERTO. Analizando automáticamente... (Último análisis: {self.last_analysis_time.strftime('%H:%M:%S') if self.last_analysis_time else 'Nunca'})", 'status': 'info'}])
+                self.start_analysis_thread(from_auto=True)
+                time.sleep(600) # Espera 10 minutos
+            else:
+                self.clear_textbox()
+                self.update_results([{'text': "Mercado CERRADO. El análisis automático se reanudará en horario de mercado.", 'status': 'info'}])
+                time.sleep(60) # Espera 1 minuto y vuelve a chequear
+        self.after(100, self.on_auto_analysis_stopped)
+
+    def is_market_open(self):
+        try:
+            tz = pytz.timezone('America/Argentina/Buenos_Aires')
+            now_ar = datetime.now(tz)
+            is_weekday = now_ar.weekday() < 5 # Lunes=0, Domingo=6
+            is_market_time = 11 <= now_ar.hour < 17
+            return is_weekday and is_market_time
+        except Exception: # Si falla pytz, asumimos que está cerrado por seguridad
+            return False
+
+    def update_results(self, messages):
+        self.results_textbox.configure(state="normal")
+        for msg in messages:
+            if isinstance(msg, dict) and 'text' in msg and 'status' in msg:
+                self.results_textbox.insert("end", f"{msg['text']}\n", msg['status'])
+            else:
+                # Fallback for unexpected message format, print as plain text
+                self.results_textbox.insert("end", f"Error: Mensaje con formato inesperado: {msg}\n", 'fail')
+
+        self.results_textbox.configure(state="disabled")
+
+    def on_analysis_complete(self):
+        self.is_loading = False
+        if not self.is_auto_analyzing.get():
+            self.analyze_button.configure(state="normal")
+
+    def on_auto_analysis_stopped(self):
+        self.analyze_button.configure(state="normal")
+        
+    def clear_textbox(self):
+        self.results_textbox.configure(state="normal")
+        self.results_textbox.delete("0.0", "end")
+        self.results_textbox.configure(state="disabled")
 
     def load_stocks(self):
         if os.path.exists(STOCKS_FILE):
