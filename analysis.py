@@ -227,27 +227,59 @@ def check_stock(ticker, period="5y", interval="1d"):
             messages.append({"text": "\n*** ALERTA DE VENTA (Konkorde + MACD) ***", "status": "alert_sell"})
             messages.append({"text": "Motivo: Cruce MACD con Institucionales vendiendo.", "status": "alert_sell"})
             pass_count += 2
-        # After all pass_count increments, create the initial header message and prepend it
+        # After all pass_count increments, finalize header and framing
         company_name = stock.info.get("longName", "")
-        header_message_text = f" {ticker.upper()}"
+        header_text = f"{ticker.upper()}"
         if company_name:
-            header_message_text += f" ({company_name})"
-
-        # Add current price
+            header_text += f" ({company_name})"
+        
         current_price = data["Close"].iloc[-1]
-        header_message_text += f" - ${current_price:.2f} USD "
+        price_text = f"Precio: ${current_price:.2f} USD"
 
-        # BORDER LOGIC
-        border_width = len(header_message_text) + 2
-        top_border = "╔" + "═" * (border_width - 2) + "╗"
-        bottom_border = "╚" + "═" * (border_width - 2) + "╝"
-        
-        header_message = {"text": f"{top_border}\n║{header_message_text}║\n╠" + "═" * (border_width - 2) + "╣", "status": "info"}
-        
-        messages.insert(0, header_message)  # Insert at the beginning
-        messages.append({"text": bottom_border, "status": "info"}) # Add at the end
+        # Create a list of all content lines to calculate max width
+        content_lines = [header_text, price_text, "═" * 10] # Divider placeholder
+        for m in messages:
+            content_lines.append(m['text'].strip())
 
-        return {"ticker": ticker, "pass_count": pass_count, "messages": messages}
+        # Find max width and add padding
+        max_w = max(len(line) for line in content_lines)
+        box_width = max_w + 4 # 2 spaces padding on each side
+
+        # Re-build messages with borders
+        framed_messages = []
+        
+        # Header
+        top_border = "╔" + "═" * (box_width) + "╗"
+        mid_border = "╠" + "═" * (box_width) + "╣"
+        bot_border = "╚" + "═" * (box_width) + "╝"
+
+        framed_messages.append({"text": top_border, "status": "info"})
+        
+        # Linea de Ticker
+        line = f"║  {header_text.ljust(max_w)}  ║"
+        framed_messages.append({"text": line, "status": "info"})
+        
+        # Linea de Precio
+        line = f"║  {price_text.ljust(max_w)}  ║"
+        framed_messages.append({"text": line, "status": "info"})
+        
+        framed_messages.append({"text": mid_border, "status": "info"})
+
+        # Contenido de indicadores
+        for m in messages:
+            text = m['text'].strip()
+            # If the text has multiple lines (like ALERTA), handle them
+            for subline in text.split('\n'):
+                subline = subline.strip()
+                if not subline: continue
+                
+                # Check if it's an alert to keep its status
+                line_str = f"║  {subline.ljust(max_w)}  ║"
+                framed_messages.append({"text": line_str, "status": m['status']})
+
+        framed_messages.append({"text": bot_border, "status": "info"})
+
+        return {"ticker": ticker, "pass_count": pass_count, "messages": framed_messages}
 
     except Exception as e:
         return {
