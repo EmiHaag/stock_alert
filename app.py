@@ -4,14 +4,42 @@ import threading
 import time
 import json
 import os
+import sys
 from datetime import datetime
 import pytz
 
-STOCKS_FILE = "stocks.json"
+class ConsoleSpinner:
+    def __init__(self, message="Analizando acciones..."):
+        self.message = message
+        self.spinner = ['|', '/', '-', '\\']
+        self.idx = 0
+        self.stop_running = threading.Event()
+        self.thread = None
+
+    def _spin(self):
+        while not self.stop_running.is_set():
+            sys.stdout.write(f"\r{self.message} {self.spinner[self.idx % 4]} ")
+            sys.stdout.flush()
+            self.idx += 1
+            time.sleep(0.1)
+        sys.stdout.write("\r" + " " * (len(self.message) + 10) + "\r") # Clear line
+        sys.stdout.flush()
+
+    def start(self):
+        self.stop_running.clear()
+        self.thread = threading.Thread(target=self._spin)
+        self.thread.daemon = True
+        self.thread.start()
+
+    def stop(self):
+        if self.thread:
+            self.stop_running.set()
+            self.thread.join()
 
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
+        self.spinner = ConsoleSpinner()
 
         # --- CONFIGURACIÓN DE LA VENTANA ---
         self.title("Monitor de Alertas de Acciones v2")
@@ -42,6 +70,10 @@ class App(ctk.CTk):
         self.label_tickers.grid(row=0, column=0, padx=10, pady=5, sticky="w")
         self.entry_tickers = ctk.CTkEntry(self.top_frame, placeholder_text="ej: AAPL, TSLA, GGAL, MELI")
         self.entry_tickers.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
+        
+        # BIND ENTER KEY
+        self.entry_tickers.bind("<Return>", lambda event: self.start_analysis_thread())
+
         self.analyze_button = ctk.CTkButton(self.top_frame, text="Analizar", command=self.start_analysis_thread)
         self.analyze_button.grid(row=0, column=2, padx=10, pady=5)
         
@@ -99,6 +131,7 @@ class App(ctk.CTk):
             self.clear_textbox()
             self.results_textbox.see("0.0") # Scroll to top when starting a new analysis
             self.update_results([{'text': "Iniciando análisis manual...", 'status': 'info'}])
+            self.spinner.start()
 
         selected_period_label = self.period_var.get()
         yfinance_params = self.YFINANCE_PERIOD_INTERVAL_MAP.get(selected_period_label, {"period": "1y", "interval": "1d"}) # Default to 1y, 1d
@@ -112,6 +145,7 @@ class App(ctk.CTk):
     def run_analysis(self, yfinance_period, yfinance_interval):
         tickers_input = self.entry_tickers.get()
         if not tickers_input:
+            self.spinner.stop()
             self.update_results([{'text': "Error: Ingrese al menos un ticker.", 'status': 'fail'}])
             self.after(100, self.on_analysis_complete)
             return
@@ -182,6 +216,7 @@ class App(ctk.CTk):
         self.results_textbox.configure(state="disabled")
 
     def on_analysis_complete(self):
+        self.spinner.stop()
         if not self.is_auto_analyzing.get():
             self.analyze_button.configure(state="normal")
 
