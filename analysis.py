@@ -190,13 +190,13 @@ def check_stock(ticker, period="5y", interval="1d"):
         
         canal_status = "info"
         if last_close > last_sma200 and slope_sma50 > 0.001:
-            canal_text = "Canal: ALCISTA (Tendencia de fondo fuerte)"
+            canal_text = "Canal: ALCISTA (Basado en SMA 50/200 - Últimos 200 días)"
             canal_status = "pass"
         elif last_close < last_sma200 and slope_sma50 < -0.001:
-            canal_text = "Canal: BAJISTA (Tendencia de fondo débil)"
+            canal_text = "Canal: BAJISTA (Basado en SMA 50/200 - Últimos 200 días)"
             canal_status = "fail"
         else:
-            canal_text = "Canal: LATERAL / CONSOLIDACIÓN"
+            canal_text = "Canal: LATERAL / CONSOLIDACIÓN (SMA 50/200)"
             canal_status = "info"
 
         adx_val = data["ADX_14"].iloc[-1]
