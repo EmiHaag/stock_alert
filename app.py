@@ -173,7 +173,7 @@ class App(ctk.CTk):
 
     def insert_separator_newlines(self):
         self.results_textbox.configure(state="normal")
-        self.results_textbox.insert("end", "\n\n")
+        self.results_textbox.insert("end", "\n\n\n")
         self.results_textbox.configure(state="disabled")
 
     def toggle_auto_analysis(self):
