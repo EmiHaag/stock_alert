@@ -91,29 +91,62 @@ def check_stock(ticker, period="5y", interval="1d"):
         if rsi_status == "pass":
             pass_count += 1
 
-        # Paso 2: MACD
-        last_macd = data["MACD_12_26_9"].iloc[-1]
-        last_macdsignal = data["MACDs_12_26_9"].iloc[-1]
-        prev_macd = data["MACD_12_26_9"].iloc[-2]
-        prev_macdsignal = data["MACDs_12_26_9"].iloc[-2]
-        cruce_alcista = prev_macd < prev_macdsignal and last_macd > last_macdsignal
-        cruce_bajista = prev_macd > prev_macdsignal and last_macd < last_macdsignal
+        # Paso 2: MACD (Detección de cruce en las últimas 4 velas)
+        macd_series = data["MACD_12_26_9"]
+        signal_series = data["MACDs_12_26_9"]
+        
+        cruce_alcista = False
+        cruce_bajista = False
+        dias_desde_cruce = 0
+
+        # Buscamos en las últimas 4 velas (índices -1 a -4)
+        for i in range(1, 5):
+            idx_curr = -i
+            idx_prev = -(i + 1)
+            
+            curr_macd = macd_series.iloc[idx_curr]
+            curr_signal = signal_series.iloc[idx_curr]
+            prev_macd = macd_series.iloc[idx_prev]
+            prev_signal = signal_series.iloc[idx_prev]
+
+            # Cruce Alcista: MACD pasa de estar debajo a estar arriba de la señal
+            if prev_macd < prev_signal and curr_macd > curr_signal:
+                cruce_alcista = True
+                dias_desde_cruce = i - 1
+                break
+            # Cruce Bajista: MACD pasa de estar arriba a estar debajo de la señal
+            if prev_macd > prev_signal and curr_macd < curr_signal:
+                cruce_bajista = True
+                dias_desde_cruce = i - 1
+                break
+
+        last_macdsignal = signal_series.iloc[-1]
+        
+        # Lógica de confirmación con RSI (para pass_count)
         macd_condition_met = (rsi_sobrecompra and cruce_bajista) or (
             rsi_sobreventa and cruce_alcista
         )
         macd_status = "pass" if macd_condition_met else "fail"
-        macd_text = f"MACD ({last_macdsignal:.2f}): {'Cruce Alcista' if cruce_alcista else 'Cruce Bajista' if cruce_bajista else 'Sin cruce reciente'}. Confirmación: {'OK' if macd_condition_met else 'NO'}"
+        
+        cruce_text = "Sin cruce reciente"
+        if cruce_alcista:
+            cruce_text = f"Cruce Alcista ({'Hoy' if dias_desde_cruce == 0 else f'hace {dias_desde_cruce}d'})"
+        elif cruce_bajista:
+            cruce_text = f"Cruce Bajista ({'Hoy' if dias_desde_cruce == 0 else f'hace {dias_desde_cruce}d'})"
+
+        macd_text = f"MACD ({last_macdsignal:.2f}): {cruce_text}. Confirmación RSI: {'OK' if macd_condition_met else 'NO'}"
         messages.append({"text": macd_text, "status": macd_status})
-        if macd_status == "pass":
+        
+        if cruce_alcista or cruce_bajista:
             pass_count += 1
 
         if cruce_alcista:
             messages.append({'text': f"\n*** ALERTA DE COMPRA para {ticker.upper()} ***", 'status': 'alert_buy'})
-            messages.append({'text': "Motivo: Cruce Alcista de MACD.", 'status': 'alert_buy'})
+            messages.append({'text': f"Motivo: {cruce_text} de MACD.", 'status': 'alert_buy'})
             pass_count += 1
         elif cruce_bajista:
             messages.append({'text': f"\n*** ALERTA DE VENTA para {ticker.upper()} ***", 'status': 'alert_sell'})
-            messages.append({'text': "Motivo: Cruce Bajista de MACD.", 'status': 'alert_sell'})
+            messages.append({'text': f"Motivo: {cruce_text} de MACD.", 'status': 'alert_sell'})
             pass_count += 1
 
         # Análisis de la señal MACD con cuantiles históricos
