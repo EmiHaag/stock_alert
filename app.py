@@ -78,7 +78,7 @@ class App(ctk.CTk):
 
         # --- FRAME PARA SELECCIÓN DE TEMPORALIDAD ---
         self.periods_frame = ctk.CTkFrame(self.top_frame, corner_radius=10)
-        self.periods_frame.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
+        self.periods_frame.grid(row=3, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
         self.periods_frame.grid_columnconfigure(0, weight=0) # Label
         for i in range(1, len(self.YFINANCE_PERIOD_INTERVAL_MAP) + 1): # For radiobuttons
             self.periods_frame.grid_columnconfigure(i, weight=1)
