@@ -13,7 +13,7 @@ STOCKS_FILE = "stocks.json"
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.spinner_chars = ['|', '/', '-', '\\']
+        self.spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
         self.spinner_idx = 0
         self.is_loading = False
 
@@ -98,19 +98,19 @@ class App(ctk.CTk):
 
     def animate_spinner(self):
         if self.is_loading:
-            char = self.spinner_chars[self.spinner_idx % 4]
+            char = self.spinner_chars[self.spinner_idx % len(self.spinner_chars)]
             self.results_textbox.configure(state="normal")
             # Overwrite the character at the very end
             self.results_textbox.delete("end-2c", "end-1c")
             self.results_textbox.insert("end-1c", char, "spinner")
             self.results_textbox.configure(state="disabled")
             self.spinner_idx += 1
-            self.after(150, self.animate_spinner)
+            self.after(80, self.animate_spinner)
         else:
-            # Clean up spinner on finish
+            # Clean up spinner on finish (no "OK")
             self.results_textbox.configure(state="normal")
             self.results_textbox.delete("end-2c", "end-1c")
-            self.results_textbox.insert("end-1c", " OK\n", "info")
+            self.results_textbox.insert("end-1c", "\n", "info")
             self.results_textbox.configure(state="disabled")
 
     def start_analysis_thread(self, from_auto=False):
