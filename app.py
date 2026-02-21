@@ -56,10 +56,6 @@ class App(ctk.CTk):
         self.auto_checkbox = ctk.CTkCheckBox(self.top_frame, text="Análisis Automático (cada 10 min)", variable=self.is_auto_analyzing, command=self.toggle_auto_analysis)
         self.auto_checkbox.grid(row=1, column=1, columnspan=2, padx=10, pady=5, sticky="w")
 
-        # --- LOADING SPINNER GUI ---
-        self.loading_label = ctk.CTkLabel(self.top_frame, text="", font=ctk.CTkFont(size=14, weight="bold"), text_color="#00FFFF")
-        self.loading_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
-
         # --- FRAME PARA SELECCIÓN DE TEMPORALIDAD ---
         self.periods_frame = ctk.CTkFrame(self.top_frame, corner_radius=10)
         self.periods_frame.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
@@ -97,16 +93,25 @@ class App(ctk.CTk):
         self.results_textbox.tag_config('fail', foreground='#FF4500') # Naranja-Rojo
         self.results_textbox.tag_config('alert_buy', foreground='#00FFFF') # Cyan
         self.results_textbox.tag_config('alert_sell', foreground='#FFD700') # Oro
+        self.results_textbox.tag_config('spinner', foreground='#00FFFF') # Color del spinner
         self.results_textbox.configure(state="disabled")
 
     def animate_spinner(self):
         if self.is_loading:
             char = self.spinner_chars[self.spinner_idx % 4]
-            self.loading_label.configure(text=f"Analizando {char}")
+            self.results_textbox.configure(state="normal")
+            # Overwrite the character at the very end
+            self.results_textbox.delete("end-2c", "end-1c")
+            self.results_textbox.insert("end-1c", char, "spinner")
+            self.results_textbox.configure(state="disabled")
             self.spinner_idx += 1
             self.after(150, self.animate_spinner)
         else:
-            self.loading_label.configure(text="")
+            # Clean up spinner on finish
+            self.results_textbox.configure(state="normal")
+            self.results_textbox.delete("end-2c", "end-1c")
+            self.results_textbox.insert("end-1c", " OK\n", "info")
+            self.results_textbox.configure(state="disabled")
 
     def start_analysis_thread(self, from_auto=False):
         if not from_auto and self.is_auto_analyzing.get():
@@ -119,9 +124,12 @@ class App(ctk.CTk):
         if not from_auto:
             self.clear_textbox()
             self.results_textbox.see("0.0") # Scroll to top when starting a new analysis
-            self.update_results([{'text': "Iniciando análisis manual...", 'status': 'info'}])
             
-            # INICIAR SPINNER GUI
+            # Start the line without a newline so spinner can append
+            self.results_textbox.configure(state="normal")
+            self.results_textbox.insert("end", "Iniciando análisis manual...  ", "info")
+            self.results_textbox.configure(state="disabled")
+            
             self.is_loading = True
             self.animate_spinner()
 
