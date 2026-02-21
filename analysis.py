@@ -66,9 +66,11 @@ def check_stock(ticker, period="5y", interval="1d"):
         data['NVI'] = nvi
         
         # 2. Suavizado para obtener las líneas de Konkorde
-        # Manos Fuertes (Azul en TradingView) -> Basado en NVI
-        nvi_ema = data['NVI'].ewm(span=255).mean() # Un periodo largo para captar la base institucional
-        data['manos_fuertes'] = (data['NVI'] - nvi_ema)
+        # Manos Fuertes (Azul en TradingView) -> Basado en NVI suavizado
+        # Usamos una EMA corta del NVI contra una EMA institucional larga
+        nvi_fast = data['NVI'].ewm(span=90).mean()
+        nvi_slow = data['NVI'].ewm(span=255).mean()
+        data['manos_fuertes'] = (nvi_fast - nvi_slow)
         
         # Minoristas (Rojo en TradingView) -> Basado en PVI y RSI
         # Aquí usamos una versión que captura la "montaña" (precio + volumen)
