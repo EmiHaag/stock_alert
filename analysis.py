@@ -141,11 +141,11 @@ def check_stock(ticker, period="5y", interval="1d"):
             pass_count += 1
 
         if cruce_alcista:
-            messages.append({'text': f"\n*** ALERTA DE COMPRA para {ticker.upper()} ***", 'status': 'alert_buy'})
+            messages.append({'text': f"\n*** MACD: ALERTA DE COMPRA para {ticker.upper()} ***", 'status': 'alert_buy'})
             messages.append({'text': f"Motivo: {cruce_text} de MACD.", 'status': 'alert_buy'})
             pass_count += 1
         elif cruce_bajista:
-            messages.append({'text': f"\n*** ALERTA DE VENTA para {ticker.upper()} ***", 'status': 'alert_sell'})
+            messages.append({'text': f"\n*** MACD: ALERTA DE VENTA para {ticker.upper()} ***", 'status': 'alert_sell'})
             messages.append({'text': f"Motivo: {cruce_text} de MACD.", 'status': 'alert_sell'})
             pass_count += 1
 
@@ -155,12 +155,12 @@ def check_stock(ticker, period="5y", interval="1d"):
         quantile_90 = macd_signal_history.quantile(0.90)
 
         if last_macdsignal <= quantile_10:
-            min_macd_text = f"MACD Signal en el 10% inferior histórico ({quantile_10:.2f}). Posible oportunidad de compra."
+            min_macd_text = f"MACD: Signal en el 10% inferior histórico ({quantile_10:.2f}). Posible oportunidad de compra."
             messages.append({'text': min_macd_text, 'status': 'alert_buy'})
             pass_count += 1
 
         if last_macdsignal >= quantile_90:
-            max_macd_text = f"MACD Signal en el 10% superior histórico ({quantile_90:.2f}). Posible oportunidad de venta."
+            max_macd_text = f"MACD: Signal en el 10% superior histórico ({quantile_90:.2f}). Posible oportunidad de venta."
             messages.append({'text': max_macd_text, 'status': 'alert_sell'})
             pass_count += 1
 
@@ -226,7 +226,7 @@ def check_stock(ticker, period="5y", interval="1d"):
         
         minorista_cruce_cero = prev_minorista < 0 and last_minorista > 0
         if minorista_cruce_cero:
-            messages.append({'text': "Konkorde: Interés minorista entrando (Cruce a cero).", 'status': 'alert_buy'})
+            messages.append({'text': "Konkorde: Interés minorista entrando (Cruce a cero). Alerta de COMPRA.", 'status': 'alert_buy'})
             pass_count += 1
         
         # Análisis de Manos Fuertes (NVI)
@@ -253,14 +253,13 @@ def check_stock(ticker, period="5y", interval="1d"):
 
         # Confirmación Konkorde + MACD
         if (cruce_alcista and mf_acumulando):
-            messages.append({"text": "\n*** ALERTA DE COMPRA (Konkorde + MACD) ***", "status": "alert_buy"})
+            messages.append({"text": "\n*** ESTRATEGIA: ALERTA DE COMPRA (Konkorde + MACD) ***", "status": "alert_buy"})
             messages.append({"text": "Motivo: Cruce MACD con Institucionales comprando.", "status": "alert_buy"})
             pass_count += 2
         elif (cruce_bajista and mf_distribuyendo):
-            messages.append({"text": "\n*** ALERTA DE VENTA (Konkorde + MACD) ***", "status": "alert_sell"})
+            messages.append({"text": "\n*** ESTRATEGIA: ALERTA DE VENTA (Konkorde + MACD) ***", "status": "alert_sell"})
             messages.append({"text": "Motivo: Cruce MACD con Institucionales vendiendo.", "status": "alert_sell"})
             pass_count += 2
-        # After all pass_count increments, finalize header and framing
         company_name = stock.info.get("longName", "")
         header_text = f"{ticker.upper()}"
         if company_name:
