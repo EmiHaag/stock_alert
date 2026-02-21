@@ -176,27 +176,27 @@ def check_stock(ticker, period="5y", interval="1d"):
             high=data["High"], low=data["Low"], close=data["Close"], window=14
         )
 
-        # --- Análisis de Canal de Tendencia (SMA 50/200) ---
+        # --- Análisis de Canal de Tendencia (SMA 20/50 - Corto/Mediano Plazo) ---
+        data["SMA_20"] = data["Close"].rolling(window=20).mean()
         data["SMA_50"] = data["Close"].rolling(window=50).mean()
-        data["SMA_200"] = data["Close"].rolling(window=200).mean()
         
         last_close = data["Close"].iloc[-1]
+        last_sma20 = data["SMA_20"].iloc[-1]
         last_sma50 = data["SMA_50"].iloc[-1]
-        last_sma200 = data["SMA_200"].iloc[-1]
         
-        # Calcular pendiente de SMA 50 (últimos 5 días)
-        prev_sma50 = data["SMA_50"].iloc[-6]
-        slope_sma50 = (last_sma50 - prev_sma50) / prev_sma50
+        # Calcular pendiente de SMA 20 (últimos 5 días)
+        prev_sma20 = data["SMA_20"].iloc[-6]
+        slope_sma20 = (last_sma20 - prev_sma20) / prev_sma20
         
         canal_status = "info"
-        if last_close > last_sma200 and slope_sma50 > 0.001:
-            canal_text = "Canal: ALCISTA (Basado en SMA 50/200 - Últimos 200 días)"
+        if last_close > last_sma50 and slope_sma20 > 0.001:
+            canal_text = "Canal: ALCISTA (Basado en SMA 20/50 - Últimos 50 días)"
             canal_status = "pass"
-        elif last_close < last_sma200 and slope_sma50 < -0.001:
-            canal_text = "Canal: BAJISTA (Basado en SMA 50/200 - Últimos 200 días)"
+        elif last_close < last_sma50 and slope_sma20 < -0.001:
+            canal_text = "Canal: BAJISTA (Basado en SMA 20/50 - Últimos 50 días)"
             canal_status = "fail"
         else:
-            canal_text = "Canal: LATERAL / CONSOLIDACIÓN (SMA 50/200)"
+            canal_text = "Canal: LATERAL / CONSOLIDACIÓN (SMA 20/50)"
             canal_status = "info"
 
         adx_val = data["ADX_14"].iloc[-1]
