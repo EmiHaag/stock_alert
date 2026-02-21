@@ -39,6 +39,7 @@ class App(ctk.CTk):
             "1 semana": {"period": "5y", "interval": "1wk"}, # 5 years of weekly data
         }
         self.period_var = ctk.StringVar(value="1 dia") # Default period label
+        self.opportunity_filter_var = ctk.StringVar(value="compra") # Default opportunity filter
 
         # --- FRAME SUPERIOR (CONTROLES) ---
         self.top_frame = ctk.CTkFrame(self, corner_radius=10)
@@ -89,6 +90,19 @@ class App(ctk.CTk):
         for i, period_label in enumerate(self.YFINANCE_PERIOD_INTERVAL_MAP.keys()):
             rb = ctk.CTkRadioButton(self.periods_frame, text=period_label, variable=self.period_var, value=period_label, command=self.period_changed)
             rb.grid(row=0, column=i+1, padx=2, pady=5, sticky="ew")
+
+        # --- FRAME PARA FILTRO DE OPORTUNIDAD ---
+        self.filters_frame = ctk.CTkFrame(self.top_frame, corner_radius=10)
+        self.filters_frame.grid(row=4, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
+        
+        self.label_filters = ctk.CTkLabel(self.filters_frame, text="Oportunidad de:", font=ctk.CTkFont(size=12))
+        self.label_filters.grid(row=0, column=0, padx=(10, 5), pady=5, sticky="w")
+        
+        self.rb_compra = ctk.CTkRadioButton(self.filters_frame, text="Compra", variable=self.opportunity_filter_var, value="compra", command=self.period_changed)
+        self.rb_compra.grid(row=0, column=1, padx=10, pady=5)
+        
+        self.rb_venta = ctk.CTkRadioButton(self.filters_frame, text="Venta", variable=self.opportunity_filter_var, value="venta", command=self.period_changed)
+        self.rb_venta.grid(row=0, column=2, padx=10, pady=5)
         
         # --- TEXTBOX DE RESULTADOS ---
         self.results_textbox = ctk.CTkTextbox(self, corner_radius=10, font=ctk.CTkFont(family="Consolas", size=13))
@@ -236,13 +250,27 @@ class App(ctk.CTk):
         # Sort reports by pass_count in descending order
         all_reports.sort(key=lambda x: x['pass_count'], reverse=True)
 
+        # APLICAR FILTRO DE OPORTUNIDAD
+        filter_type = self.opportunity_filter_var.get() # 'compra' o 'venta'
+        status_to_match = "alert_buy" if filter_type == "compra" else "alert_sell"
+        
+        filtered_reports = []
+        for report in all_reports:
+            # Si el reporte contiene al menos un mensaje con el estatus buscado
+            has_matching_opportunity = any(msg.get('status') == status_to_match for msg in report.get('messages', []))
+            if has_matching_opportunity:
+                filtered_reports.append(report)
+
         # DETENER SPINNER Y AGREGAR SALTOS DE LINEA ANTES DE MOSTRAR RESULTADOS
         self.is_loading = False
         self.after(0, self.insert_separator_newlines)
 
-        for report in all_reports:
-            self.after(100, self.update_results, report['messages'])
-            self.after(100, self.update_results, [{'text': "\n", 'status': 'info'}]) # Add a newline for separation
+        if not filtered_reports:
+            self.update_results([{'text': f"No se encontraron oportunidades de {filter_type.upper()} en esta lista.", 'status': 'info'}])
+        else:
+            for report in filtered_reports:
+                self.after(100, self.update_results, report['messages'])
+                self.after(100, self.update_results, [{'text': "\n", 'status': 'info'}]) # Add a newline for separation
         
         self.after(200, self.on_analysis_complete)
 
